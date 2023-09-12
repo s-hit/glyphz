@@ -35,8 +35,8 @@ const props = defineProps<{
   glyphDatas?: GlyphData[]
 }>()
 
-type otherTypes = 'eot' | 'woff' | 'woff2' | 'svg'
-const types = ['eot', 'woff', 'woff2', 'svg'] as otherTypes[]
+type otherTypes = 'eot' | 'woff' | 'svg'
+const types = ['eot', 'woff', 'svg'] as otherTypes[]
 
 async function save(type: 'ttf' | 'otf' | otherTypes) {
   if (props.fontId) await DB.getFontFileByID(props.fontId, type)

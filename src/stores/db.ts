@@ -75,7 +75,7 @@ export interface StatData {
   localActivity: number
 }
 
-export type FontType = 'ttf' | 'otf' | 'eot' | 'woff' | 'woff2' | 'svg'
+export type FontType = 'ttf' | 'otf' | 'eot' | 'woff' | 'svg'
 
 class GlyphzDexie extends Dexie {
   fonts!: Table<FontData>
