@@ -9,11 +9,14 @@
     </n-message-provider>
   </n-config-provider>
 
-  <div class="background" :style="{ backgroundImage: `url('/backgrounds/${background}.jpeg')` }" />
+  <div
+    class="background"
+    :style="{ backgroundImage: `url('/backgrounds/${DB.background}.jpeg')` }"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 
 import { themeOverrides } from '@/assets/overrides'
@@ -25,18 +28,6 @@ const DB = useDBStore(pinia)
 
 onMounted(async () => {
   if (localStorage.getItem('userName') !== null) await DB.userLogin()
-})
-
-const backgroundCount = 6
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
-const lsBackground = parseInt(localStorage.getItem('background') ?? '0')
-const background = ref(clamp(lsBackground, 0, backgroundCount - 1))
-
-defineExpose({
-  nextBackground: () => {
-    background.value = (background.value + 1) % backgroundCount
-    localStorage.setItem('background', background.value.toString())
-  },
 })
 </script>
 

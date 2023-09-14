@@ -62,8 +62,10 @@ const password = ref('')
 async function login() {
   try {
     await DB.newUserLogin(name.value, password.value)
+    message.success('登陆成功')
   } catch (e) {
-    message.error('登陆失败')
+    if ((e as Error).message === '403') message.error('密码错误')
+    else message.error('网络异常，登陆失败')
   }
 }
 
@@ -72,11 +74,12 @@ async function syncConfig() {
     await DB.syncConfig()
     message.success('保存成功')
   } catch (e) {
-    message.error('保存失败')
+    message.error('网络异常，保存失败')
   }
 }
 
 async function logout() {
   await DB.userLogout()
+  message.success('登出成功')
 }
 </script>

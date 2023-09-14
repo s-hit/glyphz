@@ -87,6 +87,7 @@ const themeOverrides: GlobalThemeOverrides = {
     color: 'rgba(0, 0, 0, 0.5)',
     colorError: 'rgba(0, 0, 0, 0.5)',
     colorSuccess: 'rgba(0, 0, 0, 0.5)',
+    colorLoading: 'rgba(0, 0, 0, 0.5)',
     borderRadius: '16px',
   },
 }

@@ -12,8 +12,10 @@ import GFontsList from '@/components/GFontsList.vue'
 import { useMessage } from 'naive-ui'
 const message = useMessage()
 
-import { useDBStore, type CloudFontData } from '@/stores/db'
+import { useDBStore } from '@/stores/db'
 const DB = useDBStore()
+
+import type { CloudFontData } from '@/stores/glyphz'
 
 import { useRouter } from 'vue-router'
 const router = useRouter()
@@ -24,7 +26,12 @@ defineProps<{
 
 async function download(fontKey: number) {
   try {
+    message.loading('下载中…')
     const font = <number>await DB.downloadFont(fontKey)
+
+    message.destroyAll()
+    message.success('下载成功')
+
     const time = new Date().getTime()
     await router.replace({
       name: 'home',

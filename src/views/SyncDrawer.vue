@@ -9,7 +9,9 @@
         该字体属于 {{ font?.userName }}，您无法将其与云端同步。
       </n-text>
 
-      <n-button v-else size="large" type="primary" secondary @click="sync"> 云同步 </n-button>
+      <n-button v-else size="large" type="primary" secondary @click="sync" :loading="loading">
+        云同步
+      </n-button>
     </n-space>
 
     <n-divider dashed> 统计 </n-divider>
@@ -52,13 +54,18 @@
 import GDrawer from '@/components/GDrawer.vue'
 import GStat from '@/components/GStat.vue'
 
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 
-import { useDBStore, type FontData } from '@/stores/db'
+import { useDBStore } from '@/stores/db'
 const DB = useDBStore()
+
+import type { FontData } from '@/stores/glyphz'
 
 import { useRouter } from 'vue-router'
 const router = useRouter()
+
+import { useMessage } from 'naive-ui'
+const message = useMessage()
 
 const props = defineProps<{
   font?: FontData
@@ -69,10 +76,20 @@ const forbidden = computed(() => {
   return props.font?.userName !== undefined && props.font?.userName !== DB.user?.name
 })
 
+const loading = ref(false)
 async function sync() {
   const font = props.font!.id!
   const time = new Date().getTime()
+
+  message.loading('同步中…')
+  loading.value = true
+
   await DB.syncFont(font)
+
+  message.destroyAll()
+  message.success('同步成功')
+  loading.value = false
+
   await router.replace({
     name: 'home',
     params: { font, time },

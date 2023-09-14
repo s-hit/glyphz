@@ -15,7 +15,7 @@
                   <n-text strong> {{ DB.unicodeToChar(glyph.unicode) }} </n-text>
                 </n-space>
                 <n-space justify="center">
-                  <n-text :depth="3"> {{ displayUnicode(glyph.unicode) }} </n-text>
+                  <n-text :depth="3"> {{ glyph.unicode }} </n-text>
                 </n-space>
               </n-space>
             </n-card>
@@ -64,7 +64,7 @@ import GOperations from '@/components/GOperations.vue'
 import GPreview from '@/components/GPreview.vue'
 
 import { useDBStore } from '@/stores/db'
-import type { FontData, GlyphData, Preview } from '@/stores/db'
+import type { FontData, GlyphData, Preview } from '@/stores/glyphz'
 
 const DB = useDBStore()
 
@@ -98,10 +98,6 @@ export default defineComponent({
     this.pages = Math.ceil(this.font.unicodes.length / 21)
   },
   methods: {
-    displayUnicode(unicode: string) {
-      if (unicode.length <= 4) return `000${unicode}`.slice(-4).toUpperCase()
-      return unicode.toUpperCase()
-    },
     async route(unicode: string) {
       await DB.routeToGlyph(this.$router, this.id, unicode)
     },

@@ -59,7 +59,7 @@
 
     <transition name="fade" appear>
       <g-operations v-if="page === 0">
-        <n-button tertiary @click="(<any>$root).nextBackground">
+        <n-button tertiary @click="DB.nextBackground">
           <n-icon><magic /></n-icon>
         </n-button>
 
@@ -112,24 +112,18 @@
   </main>
 </template>
 
-<script lang="ts">
-import { defineComponent } from 'vue'
-import type { FontInfo, FontData, CloudFontData, Preview } from '@/stores/db'
-
+<script setup lang="ts">
 import { Compass, Magic, UserAlt, Info } from '@vicons/fa'
-import { Table, Cog, PenAlt, SyncAlt, FileDownload } from '@vicons/fa'
+import { Table as TableIcon, Cog, PenAlt, SyncAlt, FileDownload } from '@vicons/fa'
 import { Plus, CloudDownloadAlt } from '@vicons/fa'
 
 import GTitle from '@/components/GTitle.vue'
 import GOperations from '@/components/GOperations.vue'
-import GDrawer from '@/components/GDrawer.vue'
 import GPreview from '@/components/GPreview.vue'
-
 import UserDrawer from '@/views/UserDrawer.vue'
 import AboutDrawer from '@/views/AboutDrawer.vue'
-import DownloadDrawer from './DownloadDrawer.vue'
-
-import FontInfoDrawer from './FontInfoDrawer.vue'
+import DownloadDrawer from '@/views/DownloadDrawer.vue'
+import FontInfoDrawer from '@/views/FontInfoDrawer.vue'
 import WriteDrawer from '@/views/WriteDrawer.vue'
 import SyncDrawer from '@/views/SyncDrawer.vue'
 import SaveDrawer from '@/views/SaveDrawer.vue'
@@ -137,107 +131,83 @@ import SaveDrawer from '@/views/SaveDrawer.vue'
 import { useDBStore } from '@/stores/db'
 const DB = useDBStore()
 
+import type { FontInfo, FontData, CloudFontData, Preview } from '@/stores/glyphz'
+
+import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
+const route = useRoute()
+
+import { useMessage } from 'naive-ui'
+const message = useMessage()
+
 type ExtendFontData = FontData & {
   progress?: number
   progressStyle?: string
   previewGlyphs?: Preview
 }
 
-export default defineComponent({
-  components: {
-    Compass,
-    Magic,
-    UserAlt,
-    Info,
-    TableIcon: Table,
-    Cog,
-    PenAlt,
-    SyncAlt,
-    FileDownload,
-    Plus,
-    CloudDownloadAlt,
-    GTitle,
-    GOperations,
-    GDrawer,
-    GPreview,
-    UserDrawer,
-    AboutDrawer,
-    DownloadDrawer,
-    FontInfoDrawer,
-    WriteDrawer,
-    SyncDrawer,
-    SaveDrawer,
-  },
-  data: () => ({
-    // 在 mounted 中获取初始值.
-    fonts: [] as ExtendFontData[],
-    page: 1,
+function progressStyle(progress: number) {
+  return (
+    `background-image: ` +
+    `conic-gradient(rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.35) ${progress}%, ` +
+    `transparent ${progress}%, transparent 100%);`
+  )
+}
 
-    userDrawer: false,
-    aboutDrawer: false,
-    infoDrawer: false,
-    syncDrawer: false,
-    saveDrawer: false,
+const fonts = ref<ExtendFontData[]>([])
+const page = ref(1)
+const font = computed(() => fonts.value[page.value - 1])
+const newFont = computed(() => fonts.value.length === 0 || page.value > fonts.value.length)
 
-    writeDrawer: false,
-    writeTarget: '',
+onMounted(async () => {
+  const dbFonts: ExtendFontData[] = await DB.getFonts()
+  for (const font of dbFonts) {
+    font.progress = (font.gbkCount / 7445) * 100
+    font.progressStyle = progressStyle(font.progress)
+    font.previewGlyphs = await DB.getPreviewGlyphs(font.id!, DB.recommendSentence)
+  }
+  fonts.value = dbFonts
 
-    downloadDrawer: false,
-    cloudFonts: [] as CloudFontData[],
-  }),
-  computed: {
-    newFont(): boolean {
-      return this.fonts.length === 0 || this.page > this.fonts.length
-    },
-    font(): FontData {
-      return this.fonts[this.page - 1]
-    },
-  },
-  async mounted() {
-    const fonts: ExtendFontData[] = await DB.getFonts()
-    for (const font of fonts) {
-      font.progress = (font.gbkCount / 7445) * 100
-      font.progressStyle = this.progressStyle(font.progress)
-      font.previewGlyphs = await DB.getPreviewGlyphs(font.id!, DB.recommendSentence)
-    }
-    this.fonts = fonts
+  if (route.params.font === '-1') {
+    page.value = 0
+    return
+  }
 
-    if (this.$route.params.font === '-1') {
-      this.page = 0
-    } else {
-      const index = this.fonts
-        .map(font => font.id!)
-        .indexOf(parseInt(this.$route.params.font as string))
-      this.page = index + 1 || 1
-    }
-  },
-  methods: {
-    progressStyle(progress: number) {
-      return (
-        `background-image: ` +
-        `conic-gradient(rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.35) ${progress}%, ` +
-        `transparent ${progress}%, transparent 100%);`
-      )
-    },
-    showWriteDrawer(withSentence: boolean) {
-      this.writeTarget = withSentence ? DB.recommendSentence : ''
-      this.writeDrawer = true
-    },
-    async showDownloadDrawer() {
-      if (DB.user === undefined) {
-        this.page = 0
-        this.userDrawer = true
-        return
-      }
-      this.cloudFonts = await DB.getCloudFonts()
-      this.downloadDrawer = true
-    },
-    infoSaved(info: FontInfo) {
-      Object.assign(this.fonts[this.page - 1], info)
-      this.infoDrawer = false
-    },
-  },
+  const index = fonts.value.map(font => font.id!).indexOf(parseInt(route.params.font as string))
+  page.value = index + 1 || 1
 })
+
+const userDrawer = ref(false)
+const aboutDrawer = ref(false)
+const infoDrawer = ref(false)
+const syncDrawer = ref(false)
+const saveDrawer = ref(false)
+
+const writeDrawer = ref(false)
+const writeTarget = ref('')
+function showWriteDrawer(withRecommendSentence: boolean) {
+  writeTarget.value = withRecommendSentence ? DB.recommendSentence : ''
+  writeDrawer.value = true
+}
+
+const downloadDrawer = ref(false)
+const cloudFonts = ref<CloudFontData[]>([])
+async function showDownloadDrawer() {
+  if (DB.user === undefined) {
+    page.value = 0
+    userDrawer.value = true
+  } else {
+    message.loading('加载云端字体列表中…')
+    cloudFonts.value = await DB.getCloudFonts()
+    message.destroyAll()
+    downloadDrawer.value = true
+  }
+}
+
+function infoSaved(info: FontInfo) {
+  Object.assign(fonts.value[page.value - 1], info)
+  infoDrawer.value = false
+}
 </script>
 
 <style scoped>

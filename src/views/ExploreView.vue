@@ -88,8 +88,9 @@ import GPreview from '@/components/GPreview.vue'
 import SaveDrawer from './SaveDrawer.vue'
 
 import { useDBStore } from '@/stores/db'
-import type { CloudFontData, GlyphData, Preview } from '@/stores/db'
 const DB = useDBStore()
+
+import type { CloudFontData, GlyphData, Preview } from '@/stores/glyphz'
 
 import { useMessage } from 'naive-ui'
 const message = useMessage()
@@ -112,7 +113,7 @@ watch(previewString, () => {
       previewGlyphs.value = await DB.getCloudGlyphs(font.value!.fontKey, previewString.value)
       preview.value = DB.toPreview(previewGlyphs.value, previewString.value)
     } catch {
-      message.error('加载预览字形失败')
+      message.error('网络异常，获取预览字形失败')
     }
   }, 300)
 })
@@ -121,7 +122,7 @@ onMounted(async () => {
   try {
     fonts.value = await DB.getExploreFonts()
   } catch {
-    message.error('加载字体列表失败')
+    message.error('网络异常，获取字体列表失败')
   }
 })
 
@@ -147,7 +148,7 @@ async function openSaveDrawer(full: boolean) {
     glyphs.value = full ? await DB.getCloudGlyphs(font.value!.fontKey) : previewGlyphs.value
     saveDrawer.value = true
   } catch {
-    message.error('加载字形列表失败')
+    message.error('网络异常，下载失败')
   }
 }
 </script>

@@ -29,8 +29,9 @@ import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
 
 import { useDBStore } from '@/stores/db'
-import type { GlyphData, Preview } from '@/stores/db'
 const DB = useDBStore()
+
+import type { GlyphData, Preview } from '@/stores/glyphz'
 
 export default defineComponent({
   props: {

@@ -2,8 +2,19 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { Router } from 'vue-router'
 import { Axios } from 'axios'
-import { Dexie, type Table } from 'dexie'
-import { Font, Glyph, Path } from 'opentype.js'
+
+import { GlyphzDexie, formatUnicode } from './glyphz'
+import type {
+  FontInfo,
+  FontData,
+  CloudFontData,
+  GlyphData,
+  Preview,
+  FontType,
+  UserData,
+} from './glyphz'
+
+import { Font as OTFont, Glyph as OTGlyph, Path as OTPath } from 'opentype.js'
 import { Font as FEFont } from 'fonteditor-core'
 import strToGBK from 'str2gbk'
 import crypto from 'crypto-js'
@@ -17,89 +28,11 @@ const axios = new Axios({
   transformResponse: [data => (data ? JSON.parse(data) : {})],
 })
 
+const backgroundCount = 6
 const unitsPerEm = 1024
 const ascender = 896
 const descender = ascender - unitsPerEm
 const baseUrl = 'https://s-hit.github.io/glyphz/'
-
-export interface FontInfo {
-  name: string
-  enName: string
-  description: string
-  copyright: string
-  trademark: string
-  license: string
-  isPublic: boolean
-}
-
-export type FontData = FontInfo & {
-  id?: number
-  createTime: number
-  updateTime: number
-  infoUpdateTime: number
-  syncTime: number
-  gbkCount: number
-  unicodes: string[]
-  dirty: boolean
-  fontKey: number
-  userName?: string
-}
-
-export type CloudFontData = FontData & {
-  fontKey: number
-  count: number
-  glyphs: Preview
-}
-
-export interface GlyphData {
-  id?: number
-  fontID: number
-  unicode: string
-  isGbk: boolean
-  svg: string
-  time: number
-  xMin: number
-  xMax: number
-  yMin: number
-  yMax: number
-  marginRight: number
-}
-
-export type Preview = Array<GlyphData | string>
-
-export interface StatData {
-  id?: number
-  day: number
-  fontID: number
-  cloudActivity: number
-  localActivity: number
-}
-
-export type FontType = 'ttf' | 'otf' | 'eot' | 'woff' | 'svg'
-
-class GlyphzDexie extends Dexie {
-  fonts!: Table<FontData>
-  glyphs!: Table<GlyphData>
-  stats!: Table<StatData>
-
-  constructor() {
-    super('glyphz')
-    this.version(1).stores({
-      fonts:
-        '++id, name, enName, description, copyright, trademark, license, isPublic, ' +
-        'createTime, updateTime, infoUpdateTime, syncTime, ' +
-        'gbkCount, unicodes, dirty, fontKey, userName',
-      glyphs: '++id, [fontID+unicode], svg, time, xMin, xMax, yMin, yMax, marginRight',
-      stats: '++id, fontID, day, cloudActivity, localActivity',
-    })
-  }
-}
-
-export interface UserData {
-  name: string
-  signature: string
-  avatar: string
-}
 
 const DB = new GlyphzDexie()
 
@@ -107,8 +40,8 @@ const DB = new GlyphzDexie()
  * @param {string} svg SVG path 字符串.
  * @returns `opentype.js` 使用的 Path 对象.
  */
-function svgToPath(svg: string): Path {
-  const path = new Path()
+function svgToPath(svg: string): OTPath {
+  const path = new OTPath()
   path.fill = 'black'
   path.stroke = 'none'
 
@@ -229,11 +162,11 @@ function svgToPath(svg: string): Path {
  * @param {string} svg SVG path 字符串.
  * @returns `opentype.js` 使用的 Glyph 对象.
  */
-function glyphDataToGlyph(data: GlyphData): Glyph {
+function glyphDataToGlyph(data: GlyphData): OTGlyph {
   const path = svgToPath(data.svg)
   const { unicode, xMin, xMax, yMin, yMax, marginRight } = data
 
-  const glyph = new Glyph({
+  const glyph = new OTGlyph({
     name: unicode,
     unicode: parseInt(unicode, 16),
     xMin: 0,
@@ -260,7 +193,7 @@ function glyphDataToGlyph(data: GlyphData): Glyph {
 }
 
 function numToUnicode(num: number): string {
-  return num.toString(16)
+  return formatUnicode(num.toString(16))
 }
 
 function charToUnicode(char: string): string {
@@ -398,6 +331,7 @@ async function syncFont(fontID: number) {
 
   for (const glyph of response.data.glyphs as GlyphData[]) {
     glyph.fontID = fontID
+    glyph.unicode = formatUnicode(glyph.unicode)
     const data = await DB.glyphs.where({ fontID: glyph.fontID, unicode: glyph.unicode }).first()
     if (data === undefined) {
       newUnicodes.push(glyph.unicode)
@@ -419,6 +353,7 @@ async function syncFont(fontID: number) {
 
   await DB.fonts.update(fontID, {
     ...response.data.font,
+    isPublic: !!response.data.font.isPublic,
     syncTime: new Date().getTime(),
     unicodes: font.unicodes.concat(newUnicodes),
     dirty: false,
@@ -428,14 +363,14 @@ async function syncFont(fontID: number) {
 
 async function getFontFile(fontData: FontData, glyphsData: GlyphData[], type: FontType) {
   // 字体必须包含 `.notdef` 字形.
-  const notdefGlyph = new Glyph({
+  const notdefGlyph = new OTGlyph({
     name: '.notdef',
     advanceWidth: unitsPerEm,
-    path: new Path(),
+    path: new OTPath(),
   })
   const glyphs = [notdefGlyph].concat(glyphsData.map(glyphDataToGlyph))
 
-  const font = new Font({
+  const font = new OTFont({
     familyName: fontData.enName, // Font 构造函数必须提供这个, 实际上在下面重新指定了.
     styleName: 'Normal',
     unitsPerEm,
@@ -635,6 +570,22 @@ async function syncConfig() {
 }
 
 export const useDBStore = defineStore('db', () => {
+  const background = ref(0)
+
+  function getBackgroundFromLocalStorage() {
+    background.value = Math.max(
+      0,
+      Math.min(parseInt(localStorage.getItem('background') ?? '0'), backgroundCount - 1)
+    )
+  }
+
+  getBackgroundFromLocalStorage()
+
+  function nextBackground() {
+    background.value = (background.value + 1) % backgroundCount
+    localStorage.setItem('background', background.value.toString())
+  }
+
   const user = ref<UserData | undefined>(undefined)
 
   async function newUserLogin(name: string, password: string) {
@@ -660,6 +611,7 @@ export const useDBStore = defineStore('db', () => {
         localStorage.setItem('lineWidthChangeRatio', `${config.lineWidthChangeRatio}`)
         localStorage.setItem('minForce', `${config.minForce}`)
         localStorage.setItem('maxForce', `${config.maxForce}`)
+        getBackgroundFromLocalStorage()
       }
       return
     }
@@ -783,6 +735,9 @@ export const useDBStore = defineStore('db', () => {
 
     getActivities,
     syncConfig,
+
+    background,
+    nextBackground,
 
     user,
     newUserLogin,
